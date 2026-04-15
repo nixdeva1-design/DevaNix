@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# setup-dendron — Maak de Claude node structuur aan in je Dendron workspace
+#
+# Gebruik:
+#   setup-dendron
+#   setup-dendron /pad/naar/dendron-workspace
+
+set -euo pipefail
+
+DENDRON_DIR="${1:-/home/nixos/Dendron-1}"
+DEVANIX_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+echo ""
+echo "=== DevaNix — Dendron setup ==="
+echo ""
+echo "Dendron workspace: $DENDRON_DIR"
+echo "DevaNix map:       $DEVANIX_DIR"
+echo ""
+
+# Controleer of Dendron workspace bestaat
+if [[ ! -d "$DENDRON_DIR" ]]; then
+  echo "FOUT: Dendron workspace niet gevonden: $DENDRON_DIR"
+  echo ""
+  echo "Geef het juiste pad op:"
+  echo "  setup-dendron /jouw/pad/naar/dendron"
+  exit 1
+fi
+
+# Controleer of dendron.yml bestaat (echte Dendron workspace)
+if [[ ! -f "$DENDRON_DIR/dendron.yml" ]]; then
+  echo "WAARSCHUWING: $DENDRON_DIR/dendron.yml niet gevonden."
+  echo "Is dit een Dendron workspace? Doorgaan? [j/N]"
+  read -rn1 antwoord
+  echo ""
+  if [[ "$antwoord" != "j" && "$antwoord" != "J" ]]; then
+    echo "Geannuleerd."
+    exit 0
+  fi
+fi
+
+# Functie: kopieer template als het doel nog niet bestaat
+installeer_template() {
+  local bron="$1"
+  local doel="$2"
+  local naam
+  naam=$(basename "$doel")
+
+  if [[ -f "$doel" ]]; then
+    echo "  [bestaand]  $naam"
+  else
+    cp "$bron" "$doel"
+    # Pas timestamp aan naar huidige tijd
+    local nu
+    nu=$(date +%s)
+    sed -i "s/^updated: 1$/updated: $nu/" "$doel"
+    sed -i "s/^created: 1$/created: $nu/" "$doel"
+    echo "  [aangemaakt] $naam"
+  fi
+}
+
+echo "Bestanden aanmaken:"
+installeer_template "$DEVANIX_DIR/dendron/claude.md"            "$DENDRON_DIR/claude.md"
+installeer_template "$DEVANIX_DIR/dendron/claude.gesprekken.md" "$DENDRON_DIR/claude.gesprekken.md"
+installeer_template "$DEVANIX_DIR/dendron/claude.ontwerp.md"    "$DENDRON_DIR/claude.ontwerp.md"
+installeer_template "$DEVANIX_DIR/dendron/claude.projecten.md"  "$DENDRON_DIR/claude.projecten.md"
+
+echo ""
+echo "Scripts koppelen (als ze nog niet gelinkt zijn):"
+
+# Link sla-gesprek-op als het nog niet bestaat
+if [[ ! -f /usr/local/bin/sla-gesprek-op ]]; then
+  echo "  sudo ln -sf $DEVANIX_DIR/scripts/sla-gesprek-op /usr/local/bin/sla-gesprek-op"
+  echo "  (voer dit handmatig uit of start met sudo)"
+else
+  echo "  [bestaand] sla-gesprek-op"
+fi
+
+echo ""
+echo "=== Klaar! ==="
+echo ""
+echo "De volgende bestanden staan nu in $DENDRON_DIR:"
+echo "  claude.md                 — root node"
+echo "  claude.gesprekken.md      — index van gesprekken"
+echo "  claude.ontwerp.md         — architectuurkeuzes"
+echo "  claude.projecten.md       — projectoverzicht"
+echo ""
+echo "Gesprekken opslaan:"
+echo "  sla-gesprek-op \"Onderwerp\" \"Samenvatting\""
+echo "  sla-gesprek-op --interactief"
+echo ""
+echo "In VSCodium: open Dendron en navigeer naar 'claude' om de notities te zien."

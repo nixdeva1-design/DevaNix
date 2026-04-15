@@ -50,8 +50,10 @@ services.devanix = {
 ## Stap 3 — Scripts beschikbaar maken
 
 ```bash
-sudo ln -sf ~/DevaNix/scripts/nieuw-project  /usr/local/bin/nieuw-project
+sudo ln -sf ~/DevaNix/scripts/nieuw-project   /usr/local/bin/nieuw-project
 sudo ln -sf ~/DevaNix/scripts/get-project-key /usr/local/bin/get-project-key
+sudo ln -sf ~/DevaNix/scripts/setup-dendron   /usr/local/bin/setup-dendron
+sudo ln -sf ~/DevaNix/scripts/sla-gesprek-op  /usr/local/bin/sla-gesprek-op
 sudo ln -sf ~/DevaNix/claude.sh               /usr/local/bin/claude-ask
 ```
 
@@ -71,7 +73,33 @@ Dit doet automatisch:
 
 ---
 
-## Stap 5 — VSCodium instellingen kopiëren
+## Stap 5 — Dendron integratie instellen
+
+Zorg dat je Dendron workspace bestaat (standaard aangemaakt door de Dendron extensie in VSCodium).
+
+```bash
+# Maak de Claude node structuur aan in Dendron
+setup-dendron
+
+# Koppel ook het sla-gesprek-op script
+sudo ln -sf ~/DevaNix/scripts/sla-gesprek-op /usr/local/bin/sla-gesprek-op
+sudo ln -sf ~/DevaNix/scripts/setup-dendron  /usr/local/bin/setup-dendron
+```
+
+Als je Dendron workspace op een ander pad staat:
+```bash
+setup-dendron /jouw/pad/naar/dendron
+```
+
+Na het uitvoeren staan er vier nieuwe bestanden in je Dendron workspace:
+- `claude.md` — navigatiepunt voor alles over Claude
+- `claude.gesprekken.md` — index van opgeslagen gesprekken
+- `claude.ontwerp.md` — architectuurkeuzes
+- `claude.projecten.md` — projectoverzicht
+
+---
+
+## Stap 6 — VSCodium instellingen kopiëren
 
 ```bash
 mkdir -p ~/.config/VSCodium/User
@@ -84,7 +112,7 @@ Open VSCodium → Ctrl+Shift+X → zoek: `direnv` → installeer **mkhl.direnv**
 
 ---
 
-## Stap 6 — Eerste project aanmaken
+## Stap 7 — Eerste project aanmaken
 
 ```bash
 mkdir ~/mijn-eerste-project
@@ -150,7 +178,14 @@ DevaNix/
 │   └── schema.sql         PostgreSQL schema
 ├── scripts/
 │   ├── nieuw-project      Project instellen
-│   └── get-project-key    Sleutel ophalen uit DB
+│   ├── get-project-key    Sleutel ophalen uit DB
+│   ├── setup-dendron      Claude node aanmaken in Dendron
+│   └── sla-gesprek-op     Gesprek opslaan als Dendron bestand
+├── dendron/
+│   ├── claude.md                    Template root node
+│   ├── claude.gesprekken.md         Template gesprekken index
+│   ├── claude.ontwerp.md            Template architectuurkeuzes
+│   └── claude.projecten.md          Template projectoverzicht
 ├── vscodium/
 │   └── settings.json      VSCodium instellingen
 ├── claude_client.py       Python client

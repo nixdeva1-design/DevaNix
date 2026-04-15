@@ -1,0 +1,238 @@
+#!/usr/bin/env bash
+# sla-gesprek-op — Sla een Claude gesprek op als Dendron bestand
+#
+# Gebruik:
+#   sla-gesprek-op "Onderwerp" "Samenvatting"
+#   sla-gesprek-op --interactief
+#   sla-gesprek-op --help
+
+set -euo pipefail
+
+DENDRON_DIR="${DENDRON_DIR:-/home/nixos/Dendron-1}"
+GESPREKKEN_INDEX="$DENDRON_DIR/claude.gesprekken.md"
+
+hulp() {
+  cat <<'EOF'
+sla-gesprek-op — Sla een Claude gesprek op als Dendron bestand
+
+GEBRUIK:
+  sla-gesprek-op "Onderwerp" "Samenvatting"
+  sla-gesprek-op --interactief
+  sla-gesprek-op --help
+
+OPTIES:
+  --interactief   Vraagt om onderwerp, samenvatting en details stap voor stap
+  --help          Toon deze hulp
+
+OMGEVINGSVARIABELEN:
+  DENDRON_DIR     Pad naar Dendron workspace (standaard: /home/nixos/Dendron-1)
+
+VOORBEELDEN:
+  sla-gesprek-op "NixOS module bouwen" "Hebben claude-dev.nix gebouwd met PostgreSQL en direnv"
+  sla-gesprek-op --interactief
+
+Het gesprek wordt opgeslagen in:
+  $DENDRON_DIR/claude.gesprekken.YYYY-MM-DD.md
+EOF
+}
+
+controleer_dendron_dir() {
+  if [[ ! -d "$DENDRON_DIR" ]]; then
+    echo "FOUT: Dendron map niet gevonden: $DENDRON_DIR"
+    echo "Pas DENDRON_DIR aan of voer eerst uit: setup-dendron"
+    exit 1
+  fi
+}
+
+# Maak een unieke bestandsnaam voor vandaag
+gesprek_bestandsnaam() {
+  local datum
+  datum=$(date +%Y-%m-%d)
+  local basis="$DENDRON_DIR/claude.gesprekken.$datum.md"
+
+  if [[ ! -f "$basis" ]]; then
+    echo "$basis"
+    return
+  fi
+
+  # Als er al een bestand is voor vandaag, voeg een nummer toe
+  local teller=2
+  while [[ -f "$DENDRON_DIR/claude.gesprekken.$datum-$teller.md" ]]; do
+    ((teller++))
+  done
+  echo "$DENDRON_DIR/claude.gesprekken.$datum-$teller.md"
+}
+
+# Voeg een regel toe aan de gesprekken index
+update_index() {
+  local datum="$1"
+  local onderwerp="$2"
+  local bestandsnaam="$3"
+  local basename_zonder_ext="${bestandsnaam%.md}"
+  local node_id
+  node_id=$(basename "$basename_zonder_ext")
+
+  # Voeg toe na de <!-- marker -->
+  local regel="- [[${node_id}]] — ${onderwerp} (${datum})"
+
+  if grep -q "^<!-- Nieuwe gesprekken" "$GESPREKKEN_INDEX" 2>/dev/null; then
+    # Voeg na de marker in
+    local tmp
+    tmp=$(mktemp)
+    while IFS= read -r lijn; do
+      echo "$lijn" >> "$tmp"
+      if [[ "$lijn" == "<!-- Nieuwe gesprekken"* ]]; then
+        echo "$regel" >> "$tmp"
+      fi
+    done < "$GESPREKKEN_INDEX"
+    mv "$tmp" "$GESPREKKEN_INDEX"
+  else
+    echo "$regel" >> "$GESPREKKEN_INDEX"
+  fi
+}
+
+# Schrijf het gesprek bestand
+schrijf_gesprek() {
+  local bestand="$1"
+  local onderwerp="$2"
+  local samenvatting="$3"
+  local details="${4:-}"
+  local datum
+  datum=$(date +%Y-%m-%d)
+  local tijdstip
+  tijdstip=$(date +%H:%M)
+  local node_id
+  node_id=$(basename "${bestand%.md}")
+
+  # Bepaal het project (als direnv actief is)
+  local project="${DEVANIX_PROJECT:-onbekend}"
+
+  cat > "$bestand" <<EOF
+---
+id: ${node_id}
+title: ${onderwerp}
+desc: ${samenvatting}
+updated: $(date +%s)
+created: $(date +%s)
+---
+
+# ${onderwerp}
+
+**Datum**: ${datum} ${tijdstip}
+**Project**: ${project}
+
+## Samenvatting
+
+${samenvatting}
+EOF
+
+  if [[ -n "$details" ]]; then
+    cat >> "$bestand" <<EOF
+
+## Details
+
+${details}
+EOF
+  fi
+
+  cat >> "$bestand" <<EOF
+
+## Actiepunten
+
+<!-- Voeg hier actiepunten toe die uit dit gesprek kwamen -->
+
+## Gerelateerd
+
+- [[claude.gesprekken]] — Terug naar overzicht
+- [[claude.projecten]] — Projecten overzicht
+EOF
+
+  echo "Opgeslagen: $bestand"
+}
+
+# Interactieve modus
+interactief() {
+  echo ""
+  echo "=== Gesprek opslaan in Dendron ==="
+  echo ""
+
+  read -rp "Onderwerp van het gesprek: " onderwerp
+  if [[ -z "$onderwerp" ]]; then
+    echo "Geannuleerd."
+    exit 0
+  fi
+
+  echo "Samenvatting (druk op Enter voor een lege regel, nog een Enter om te stoppen):"
+  local samenvatting=""
+  local lijn
+  local lege_lijn=0
+  while IFS= read -r lijn; do
+    if [[ -z "$lijn" ]]; then
+      if ((lege_lijn == 1)); then
+        break
+      fi
+      lege_lijn=1
+    else
+      lege_lijn=0
+    fi
+    samenvatting+="${lijn}"$'\n'
+  done
+  samenvatting="${samenvatting%$'\n'}"
+
+  echo ""
+  echo "Details/notities (optioneel, zelfde manier afsluiten):"
+  local details=""
+  lege_lijn=0
+  while IFS= read -r lijn; do
+    if [[ -z "$lijn" ]]; then
+      if ((lege_lijn == 1)); then
+        break
+      fi
+      lege_lijn=1
+    else
+      lege_lijn=0
+    fi
+    details+="${lijn}"$'\n'
+  done
+  details="${details%$'\n'}"
+
+  controleer_dendron_dir
+  local bestand
+  bestand=$(gesprek_bestandsnaam)
+  local datum
+  datum=$(date +%Y-%m-%d)
+
+  schrijf_gesprek "$bestand" "$onderwerp" "$samenvatting" "$details"
+  update_index "$datum" "$onderwerp" "$bestand"
+}
+
+# ── Hoofdlogica ──────────────────────────────────────────────────────────────
+
+case "${1:-}" in
+  --help|-h)
+    hulp
+    exit 0
+    ;;
+  --interactief|-i)
+    interactief
+    exit 0
+    ;;
+  "")
+    hulp
+    exit 1
+    ;;
+  *)
+    # Directe aanroep: sla-gesprek-op "Onderwerp" "Samenvatting"
+    ONDERWERP="$1"
+    SAMENVATTING="${2:-Geen samenvatting opgegeven}"
+    DETAILS="${3:-}"
+
+    controleer_dendron_dir
+
+    BESTAND=$(gesprek_bestandsnaam)
+    DATUM=$(date +%Y-%m-%d)
+
+    schrijf_gesprek "$BESTAND" "$ONDERWERP" "$SAMENVATTING" "$DETAILS"
+    update_index "$DATUM" "$ONDERWERP" "$BESTAND"
+    ;;
+esac

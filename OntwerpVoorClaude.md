@@ -116,6 +116,54 @@ claude-ask "jouw vraag"
 ### `vscodium/settings.json`
 VSCodium instellingen met direnv integratie.
 
+### `dendron/` — Dendron templates
+Templates voor de Claude node hiërarchie in Dendron:
+- `claude.md` — root node
+- `claude.gesprekken.md` — gesprekken index
+- `claude.ontwerp.md` — architectuurkeuzes
+- `claude.projecten.md` — projectoverzicht
+
+### `scripts/setup-dendron`
+Eenmalig script dat de Claude node structuur aanmaakt in de Dendron workspace:
+```bash
+setup-dendron                          # gebruikt /home/nixos/Dendron-1
+setup-dendron /ander/pad/naar/dendron  # aangepast pad
+```
+Kopieert de templates naar de Dendron workspace zonder bestaande bestanden te overschrijven.
+
+### `scripts/sla-gesprek-op`
+Slaat een gesprek op als Dendron bestand:
+```bash
+sla-gesprek-op "Onderwerp" "Samenvatting"
+sla-gesprek-op --interactief
+```
+Maakt `claude.gesprekken.YYYY-MM-DD.md` aan in de Dendron workspace
+en voegt een regel toe aan `claude.gesprekken.md` (de index).
+
+---
+
+## Dendron workspace
+
+Locatie: `/home/nixos/Dendron-1/`
+Config: `/home/nixos/Dendron-1/dendron.yml`
+
+### Claude node structuur
+```
+Dendron-1/
+├── claude.md                          ← root, navigatiepunt
+├── claude.gesprekken.md               ← index van alle gesprekken
+├── claude.gesprekken.2025-01-15.md    ← gesprek op die datum (auto-aangemaakt)
+├── claude.ontwerp.md                  ← architectuurkeuzes
+└── claude.projecten.md                ← projectoverzicht
+```
+
+### Gesprek opslaan na een sessie
+```bash
+sla-gesprek-op "Wat we besproken hebben" "Korte samenvatting"
+# of interactief:
+sla-gesprek-op --interactief
+```
+
 ---
 
 ## Hoe direnv werkt in dit systeem
@@ -147,8 +195,12 @@ Geen sleutel staat ooit in een bestand — alleen in PostgreSQL.
 - [ ] Telefoon verbinden met de API server
 
 ### Prioriteit 2 — Dendron integratie
+- [x] Claude node structuur aanmaken als templates in `dendron/`
+- [x] `setup-dendron` script bouwen voor eenmalige installatie
+- [x] `sla-gesprek-op` script bouwen voor gesprekken opslaan
+- [ ] `setup-dendron` uitvoeren op de echte NixOS machine (`/home/nixos/Dendron-1`)
+- [ ] `sudo ln -sf ~/DevaNix/scripts/sla-gesprek-op /usr/local/bin/sla-gesprek-op`
 - [ ] Dendron workspace koppelen aan DevaNix projectstructuur
-- [ ] Hiërarchische notities worden projectdocumentatie
 - [ ] Ontwerp-notities traceerbaar naar code
 
 ### Prioriteit 3 — Datalog laag
@@ -183,9 +235,12 @@ Geen sleutel staat ooit in een bestand — alleen in PostgreSQL.
 ```bash
 git clone https://github.com/nixdeva1-design/devanix ~/DevaNix
 cd ~/DevaNix
-sudo ln -sf ~/DevaNix/scripts/nieuw-project    /usr/local/bin/nieuw-project
-sudo ln -sf ~/DevaNix/scripts/get-project-key  /usr/local/bin/get-project-key
-sudo ln -sf ~/DevaNix/claude.sh                /usr/local/bin/claude-ask
+sudo ln -sf ~/DevaNix/scripts/nieuw-project   /usr/local/bin/nieuw-project
+sudo ln -sf ~/DevaNix/scripts/get-project-key /usr/local/bin/get-project-key
+sudo ln -sf ~/DevaNix/scripts/setup-dendron   /usr/local/bin/setup-dendron
+sudo ln -sf ~/DevaNix/scripts/sla-gesprek-op  /usr/local/bin/sla-gesprek-op
+sudo ln -sf ~/DevaNix/claude.sh               /usr/local/bin/claude-ask
+setup-dendron   # maakt claude node aan in /home/nixos/Dendron-1
 # Voeg NixOS module toe aan /etc/nixos/configuration.nix
 sudo nixos-rebuild switch
 ```
