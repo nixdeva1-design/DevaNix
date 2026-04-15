@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Haal API-sleutel op uit PostgreSQL voor een project
+# Gebruik: get-project-key [projectnaam]
+# Zonder naam: gebruikt huidige git-map als projectnaam
+
+PROJECT="${1:-}"
+
+if [ -z "$PROJECT" ]; then
+  GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+  if [ -n "$GIT_ROOT" ]; then
+    PROJECT=$(basename "$GIT_ROOT")
+  else
+    PROJECT=$(basename "$PWD")
+  fi
+fi
+
+SLEUTEL=$(psql -t -A "${DEVANIX_DB:-projectkeys}" \
+  -c "SELECT api_sleutel FROM projecten WHERE naam = '$PROJECT'" \
+  2>/dev/null | tr -d '[:space:]')
+
+if [ -z "$SLEUTEL" ]; then
+  echo "" # leeg — geen fout, direnv blijft rustig
+  exit 0
+fi
+
+echo "$SLEUTEL"

@@ -1,0 +1,23 @@
+{
+  // ── direnv: laad automatisch omgevingsvariabelen per project ──────────────
+  "direnv.restart.automatic": true,
+  "direnv.status.showChangesInStatusBar": true,
+
+  // ── Terminal: zorg dat direnv werkt in de geïntegreerde terminal ───────────
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.env.linux": {},
+
+  // ── Neovim als editor (optioneel) ──────────────────────────────────────────
+  // "editor.fontSize": 14,
+  // "editor.fontFamily": "JetBrains Mono, monospace",
+
+  // ── Git ───────────────────────────────────────────────────────────────────
+  "git.autofetch": true,
+
+  // ── Bestanden die je niet wilt zien ───────────────────────────────────────
+  "files.exclude": {
+    "**/.direnv": true,
+    "**/__pycache__": true,
+    "**/*.pyc": true
+  }
+}

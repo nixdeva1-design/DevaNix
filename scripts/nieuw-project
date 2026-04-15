@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+# DevaNix — nieuw project instellen of bestaand openen
+# Gebruik: nieuw-project
+# Roep aan vanuit de projectmap (met git init gedaan)
+
+set -euo pipefail
+
+DB="${DEVANIX_DB:-projectkeys}"
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ── Projectnaam bepalen ──────────────────────────────────────────────────────
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
+if [ -n "$GIT_ROOT" ]; then
+  PROJECT=$(basename "$GIT_ROOT")
+  cd "$GIT_ROOT"
+else
+  PROJECT=$(basename "$PWD")
+fi
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  DevaNix — project: $PROJECT"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# ── Controleer of project al bestaat in database ─────────────────────────────
+BESTAAND=$(psql -t -A "$DB" \
+  -c "SELECT api_sleutel FROM projecten WHERE naam = '$PROJECT'" \
+  2>/dev/null | tr -d '[:space:]')
+
+if [ -n "$BESTAAND" ]; then
+  echo ""
+  echo "✓ Project '$PROJECT' gevonden in database."
+  echo ""
+  echo "  [1] Doorgaan met bestaande sleutel"
+  echo "  [2] Nieuwe sleutel invoeren"
+  echo "  [3] Annuleren"
+  echo ""
+  read -rp "Keuze (1/2/3): " KEUZE
+
+  case "$KEUZE" in
+    1)
+      SLEUTEL="$BESTAAND"
+      ;;
+    2)
+      echo ""
+      echo "Browser opent naar Anthropic console..."
+      xdg-open "https://console.anthropic.com/settings/keys" 2>/dev/null || true
+      echo ""
+      read -rsp "Plak nieuwe sleutel (onzichtbaar): " SLEUTEL
+      echo ""
+
+      psql "$DB" -c \
+        "UPDATE projecten SET api_sleutel = '$SLEUTEL' WHERE naam = '$PROJECT'"
+      echo "✓ Sleutel bijgewerkt in database."
+      ;;
+    *)
+      echo "Geannuleerd."
+      exit 0
+      ;;
+  esac
+
+else
+  # ── Nieuw project ────────────────────────────────────────────────────────
+  echo ""
+  echo "Nieuw project. Wat wil je doen?"
+  echo ""
+  echo "  [1] Nieuwe API-sleutel aanmaken (opent browser)"
+  echo "  [2] Bestaande sleutel invoeren"
+  echo "  [3] Annuleren"
+  echo ""
+  read -rp "Keuze (1/2/3): " KEUZE
+
+  case "$KEUZE" in
+    1)
+      echo ""
+      echo "Browser opent naar Anthropic console..."
+      xdg-open "https://console.anthropic.com/settings/keys" 2>/dev/null || true
+      echo ""
+      read -rsp "Plak je nieuwe sleutel (onzichtbaar): " SLEUTEL
+      echo ""
+      ;;
+    2)
+      echo ""
+      read -rsp "Plak je sleutel (onzichtbaar): " SLEUTEL
+      echo ""
+      ;;
+    *)
+      echo "Geannuleerd."
+      exit 0
+      ;;
+  esac
+
+  # Optionele metadata
+  echo ""
+  read -rp "Korte omschrijving (optioneel, Enter om over te slaan): " OMSCHRIJVING
+  read -rp "Talen (optioneel, bijv: rust python html, Enter om over te slaan): " TALEN_RAW
+
+  # Talen omzetten naar postgres array
+  TALEN_ARG="NULL"
+  if [ -n "$TALEN_RAW" ]; then
+    TALEN_ARG="ARRAY[$(echo "$TALEN_RAW" | tr ' ' '\n' | \
+      awk '{printf "\x27" $0 "\x27,"}' | sed 's/,$//')]"
+  fi
+
+  OMSCHRIJVING_ARG="NULL"
+  if [ -n "$OMSCHRIJVING" ]; then
+    OMSCHRIJVING_ARG="'$(echo "$OMSCHRIJVING" | sed "s/'/''/g")'"
+  fi
+
+  psql "$DB" -c \
+    "INSERT INTO projecten (naam, api_sleutel, omschrijving, talen)
+     VALUES ('$PROJECT', '$SLEUTEL', $OMSCHRIJVING_ARG, $TALEN_ARG)"
+
+  echo "✓ Project '$PROJECT' opgeslagen in database."
+fi
+
+# ── .envrc aanmaken voor direnv ──────────────────────────────────────────────
+cat > .envrc << 'ENVRC'
+# DevaNix — direnv laadt de sleutel automatisch uit PostgreSQL
+# Geen sleutel in dit bestand — veilig om in git te zetten
+
+export ANTHROPIC_API_KEY=$(get-project-key)
+
+# Neovim + VSCodium herkennen dit project
+export DEVANIX_PROJECT=$(basename "$PWD")
+ENVRC
+
+direnv allow .
+echo "✓ .envrc aangemaakt — sleutel wordt automatisch geladen."
+
+# ── git init als nog niet gedaan ─────────────────────────────────────────────
+if [ -z "$GIT_ROOT" ]; then
+  git init
+  echo "✓ Git repository geïnitialiseerd."
+fi
+
+# ── .gitignore aanmaken als nog niet aanwezig ────────────────────────────────
+if [ ! -f .gitignore ]; then
+  cat > .gitignore << 'GI'
+.env
+.direnv/
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+result
+GI
+  echo "✓ .gitignore aangemaakt."
+fi
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Klaar! Project '$PROJECT' actief."
+echo ""
+echo "  Sleutel wordt geladen zodra je:"
+echo "  → cd $PWD"
+echo "  → of de map opent in VSCodium"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""

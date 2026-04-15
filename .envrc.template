@@ -1,0 +1,12 @@
+# DevaNix direnv template
+# Kopieer naar je projectmap als .envrc
+# Daarna: direnv allow
+
+# Sleutel komt automatisch uit PostgreSQL — nooit hardcoded
+export ANTHROPIC_API_KEY=$(get-project-key)
+
+# Projectnaam voor scripts
+export DEVANIX_PROJECT=$(basename "$PWD")
+
+# Database naam (standaard: projectkeys)
+export DEVANIX_DB="projectkeys"
