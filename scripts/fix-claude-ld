@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -e
+
+CLAUDE_BIN=$(readlink -f "$(which claude 2>/dev/null || echo /opt/claude-code/bin/claude)")
+
+if [ ! -f "$CLAUDE_BIN" ]; then
+  echo "claude binary niet gevonden op $CLAUDE_BIN"
+  exit 1
+fi
+
+echo "Claude binary: $CLAUDE_BIN"
+
+GLIBC=$(nix-build '<nixpkgs>' -A glibc --no-out-link 2>/dev/null)
+if [ -z "$GLIBC" ]; then
+  echo "glibc niet gevonden in nixpkgs"
+  exit 1
+fi
+
+INTERP="$GLIBC/lib/ld-linux-x86-64.so.2"
+echo "Interpreter: $INTERP"
+
+nix-shell -p patchelf --run "patchelf --set-interpreter '$INTERP' '$CLAUDE_BIN'"
+
+echo "Klaar. Test: claude --version"
