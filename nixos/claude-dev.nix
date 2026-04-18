@@ -102,6 +102,9 @@ in {
       };
     };
 
+    # ── nix-ld: run generic Linux binaries (zoals Claude Code CLI) ──────────
+    programs.nix-ld.enable = true;
+
     # ── direnv ───────────────────────────────────────────────────────────────
     programs.direnv = {
       enable          = true;
